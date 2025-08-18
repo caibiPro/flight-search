@@ -23,7 +23,7 @@
 ### 开发工具
 - **Kotlin**: 1.9.24
 - **Gradle**: 8.8.2
-- **编译工具链**: Java 11
+- **编译工具链**: Java 17
 
 ## 项目结构
 
@@ -211,6 +211,16 @@ sqlite3 flight_database.db
   - Kotlin 1.9.24 + Compose Compiler 1.5.14 (官方兼容组合)
   - AGP 8.8.2 + compileSdk 35 (稳定环境)
   - JDK 17 工具链 (现代化基础)
+- **主题系统**: Material Theme Builder生成的航空蓝主题
+  - 种子色: #769CDF (航空蓝)
+  - 支持动态颜色 (Android 12+)
+  - 避免使用弃用的statusBarColor API
+
+### 待升级项目
+- **Edge-to-Edge设计**: 计划在基础功能完成后升级
+  - 当前: 传统状态栏处理
+  - 目标: 现代沉浸式体验
+  - 优势: 更好的屏幕利用率和视觉连贯性
 
 ### 跨会话开发指南
 1. 每次新会话开始前：`git pull origin dev`
