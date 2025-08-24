@@ -2,10 +2,10 @@ package com.mingqing.flightsearch.presentation.theme
 
 import androidx.compose.ui.graphics.Color
 
-// 从 Material Theme Builder 生成的颜色系统
-// 基础种子色: #769CDF (航空蓝)
+// Color system generated from Material Theme Builder
+// Base seed color: #769CDF (Aviation Blue)
 
-// 浅色主题颜色
+// Light theme colors
 val md_theme_light_primary = Color(0xFF415F91)
 val md_theme_light_onPrimary = Color(0xFFFFFFFF)
 val md_theme_light_primaryContainer = Color(0xFFD6E3FF)
@@ -41,7 +41,7 @@ val md_theme_light_inverseSurface = Color(0xFF2E3036)
 val md_theme_light_inverseOnSurface = Color(0xFFF0F0F7)
 val md_theme_light_inversePrimary = Color(0xFFAAC7FF)
 
-// 深色主题颜色
+// Dark theme colors
 val md_theme_dark_primary = Color(0xFFAAC7FF)
 val md_theme_dark_onPrimary = Color(0xFF0A305F)
 val md_theme_dark_primaryContainer = Color(0xFF284777)
@@ -77,5 +77,5 @@ val md_theme_dark_inverseSurface = Color(0xFFE2E2E9)
 val md_theme_dark_inverseOnSurface = Color(0xFF2E3036)
 val md_theme_dark_inversePrimary = Color(0xFF415F91)
 
-// 种子色 - 用于扩展颜色
+// Seed color - used for extended colors
 val seed = Color(0xFF769CDF)

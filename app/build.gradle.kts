@@ -60,7 +60,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.activity.compose)
 
-    // 调试工具
+    // Debug tools
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

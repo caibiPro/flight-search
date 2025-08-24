@@ -100,6 +100,11 @@ fun FlightSearchTheme(
         SideEffect {
             val window = (view.context as Activity).window
             val controller = WindowCompat.getInsetsController(window, view)
+
+            // Enable edge-to-edge design
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+
+            // Make status bar transparent and adjust content colors based on theme
             controller.isAppearanceLightStatusBars = !darkTheme
             controller.isAppearanceLightNavigationBars = !darkTheme
         }
