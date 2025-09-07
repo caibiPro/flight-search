@@ -214,6 +214,7 @@ sqlite3 flight_database.db
   - [x] 依赖注入 (完整的Hilt配置)
   - [x] Paging 3集成 (大数据量处理)
   - [x] Flow响应式编程 (shareIn性能优化)
+  - [x] DataStore用户偏好存储 (搜索状态持久化)
 - [ ] ViewModel层 (业务逻辑和UI状态管理)
 - [ ] UI层 (Compose界面组件)
 - [ ] 导航系统 (Navigation Compose)
@@ -258,6 +259,7 @@ sqlite3 flight_database.db
   - Paging 3无缝集成，支持大数据量处理
   - Hilt依赖注入完整配置，@Singleton + @ApplicationContext
   - 竞态条件防护，线程安全的数据操作
+  - DataStore响应式用户偏好存储，搜索状态持久化
 - **依赖配置优化**: 解决了Paging Compose和Room Paging的依赖问题
 
 ### 已解决的技术问题
