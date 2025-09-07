@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "949a64cc0fb38ad0c787a756ab7ad539",
+    "identityHash": "97af52819a03f27634dbf147f81496f5",
     "entities": [
       {
         "tableName": "airport",
@@ -90,14 +90,25 @@
             "id"
           ]
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_favorite_departure_code_destination_code",
+            "unique": false,
+            "columnNames": [
+              "departure_code",
+              "destination_code"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_favorite_departure_code_destination_code` ON `${TABLE_NAME}` (`departure_code`, `destination_code`)"
+          }
+        ],
         "foreignKeys": []
       }
     ],
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '949a64cc0fb38ad0c787a756ab7ad539')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '97af52819a03f27634dbf147f81496f5')"
     ]
   }
 }
