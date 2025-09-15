@@ -9,18 +9,12 @@ import com.mingqing.flightsearch.domain.repository.FavoriteRepository
 import com.mingqing.flightsearch.domain.repository.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.seconds
 
 @HiltViewModel
 class FlightSearchViewModel @Inject constructor(
@@ -29,216 +23,235 @@ class FlightSearchViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
-    // UI状态管理
-    private val _uiState = MutableStateFlow(FlightSearchUiState())
-    val uiState: StateFlow<FlightSearchUiState> = _uiState.asStateFlow()
+    private var searchQueryJob: Job? = null
+    private var previousState: FlightSearchUiState? = null
 
-    // 搜索查询状态 - 直接从DataStore获取
-    val searchQuery: StateFlow<String> = userPreferencesRepository.getSearchQuery()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), "")
-
-    // 收藏列表状态 - 独立管理
-    private val _favorites = favoriteRepository.getAllFavorites()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyList())
-
-    init {
-        setupSearch()
-        setupFavoritesDisplay()
+    companion object {
+        private val OPERATION_TIMEOUT = 10.seconds
+        private const val SEARCH_DEBOUNCE_MS = 300L
     }
 
-    // 核心优化：统一的状态更新器
-    private fun updateUiState(updater: FlightSearchUiState.() -> FlightSearchUiState) {
-        _uiState.value = _uiState.value.updater()
+    private val _uiState = MutableStateFlow<FlightSearchUiState>(FlightSearchUiState.Loading)
+    val uiState: StateFlow<FlightSearchUiState> = _uiState.asStateFlow()
+
+    // 依然保留对搜索词的监听，这是驱动搜索逻辑的最佳方式
+    private val searchQuery: StateFlow<String> = userPreferencesRepository.getSearchQuery()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = ""
+        )
+
+    init {
+        // 启动时，监听搜索词的变化
+        observeSearchQuery()
+    }
+
+    // 步骤 3: 采用一个中心化的事件处理器
+    fun onEvent(event: FlightSearchEvent) {
+        when (event) {
+            is FlightSearchEvent.AirportSelected -> selectAirport(event.airport)
+            is FlightSearchEvent.QueryChanged -> updateSearchQuery(event.query)
+            is FlightSearchEvent.ToggleFavoriteClicked -> toggleFavorite(event.departureCode, event.destinationCode)
+            is FlightSearchEvent.BackToPreviousScreen -> backToPreviousScreen()
+        }
     }
 
     @OptIn(FlowPreview::class)
-    private fun setupSearch() {
-        viewModelScope.launch {
+    private fun observeSearchQuery() {
+        searchQueryJob?.cancel()
+        searchQueryJob = viewModelScope.launch {
             searchQuery
-                .debounce(300)
+                .debounce(SEARCH_DEBOUNCE_MS)
                 .distinctUntilChanged()
                 .collect { query ->
-                    if (query.isNotBlank()) {
-                        performSearch(query)
-                    } else {
-                        // 清空搜索，准备显示收藏
-                        updateUiState { clearSearch() }
-                    }
+                    showFavoriteOrSearch(query)
                 }
         }
     }
 
-    private fun setupFavoritesDisplay() {
-        combine(searchQuery, _favorites) { query, favorites ->
-            if (query.isBlank()) {
-                updateUiState { showFavorites(favorites) }
-            }
-        }.launchIn(viewModelScope)
-    }
-
-    private fun performSearch(query: String) {
-        viewModelScope.launch {
-            updateUiState { showLoading() }
-
-            try {
-                airportRepository.searchAirports(query)
-                    .catch { e -> updateUiState { showError(e.message) } }
-                    .collect { airports -> updateUiState { showAirports(airports) } }
-            } catch (e: Exception) {
-                updateUiState { showError(e.message) }
-            }
+    private suspend fun showFavoriteOrSearch(query: String) {
+        if (query.isBlank()) {
+            loadFavorites()
+        } else {
+            performSearch(query)
         }
     }
 
-    fun updateSearchQuery(query: String) {
+    private suspend fun loadFavorites() {
+        val result = withTimeoutOrNull(OPERATION_TIMEOUT) {
+            favoriteRepository.getAllFavorites()
+                .catch { e ->
+                    _uiState.value =
+                        FlightSearchUiState.Error(e.message ?: "Failed to load favorites")
+                }
+                .collect { favorites ->
+                    _uiState.value = FlightSearchUiState.Favorites(favorites)
+                }
+        }
+
+        if (result == null) {
+            _uiState.value = FlightSearchUiState.Error("Request timed out. Please try again.")
+        }
+    }
+
+    private suspend fun performSearch(query: String) {
+        // Store current state before transitioning to search
+        if (_uiState.value !is FlightSearchUiState.SearchResults) {
+            previousState = _uiState.value
+        }
+
+        _uiState.value = FlightSearchUiState.SearchResults(
+            query = query,
+            airports = emptyList(),
+            isLoading = true
+        )
+
+        val result = withTimeoutOrNull(OPERATION_TIMEOUT) {
+            airportRepository.searchAirports(query)
+                .catch { e ->
+                    _uiState.value = FlightSearchUiState.Error(e.message ?: "Search failed")
+                }
+                .collect { airports ->
+                    _uiState.value =
+                        FlightSearchUiState.SearchResults(query = query, airports = airports)
+                }
+        }
+
+        if (result == null) {
+            _uiState.value = FlightSearchUiState.Error("Search timed out. Please try again.")
+        }
+    }
+
+    private fun updateSearchQuery(query: String) {
         viewModelScope.launch {
             userPreferencesRepository.saveSearchQuery(query)
         }
     }
 
-    fun selectAirport(airport: Airport) {
+    @OptIn(FlowPreview::class)
+    private fun selectAirport(airport: Airport) {
         viewModelScope.launch {
-            updateUiState { showLoading().selectAirport(airport) }
+            // Store current state before transitioning to routes
+            previousState = _uiState.value
+
+            _uiState.value = FlightSearchUiState.Routes(
+                departureAirport = airport,
+                destinationAirports = emptyList(),
+                isLoading = true
+            )
 
             try {
-                airportRepository.getAirportsExcept(airport.iataCode)
-                    .catch { e ->
-                        updateUiState { showError(e.message) }
+                val destinations = withTimeoutOrNull(OPERATION_TIMEOUT) {
+                    airportRepository.getAirportsExcept(airport.iataCode)
+                        .timeout(OPERATION_TIMEOUT)
+                        .firstOrNull()
+                }
+
+                when {
+                    destinations == null -> {
+                        _uiState.value = FlightSearchUiState.Error("Request timed out. Please try again.")
                     }
-                    .collect { destinationAirports ->
-                        updateUiState { showRoutes(airport, destinationAirports) }
+                    destinations.isEmpty() -> {
+                        _uiState.value = FlightSearchUiState.Routes(
+                            departureAirport = airport,
+                            destinationAirports = emptyList(),
+                            isLoading = false
+                        )
                     }
+                    else -> {
+                        _uiState.value = FlightSearchUiState.Routes(
+                            departureAirport = airport,
+                            destinationAirports = destinations,
+                            isLoading = false
+                        )
+                    }
+                }
             } catch (e: Exception) {
-                updateUiState { showError(e.message) }
+                _uiState.value = FlightSearchUiState.Error(
+                    e.message ?: "Failed to load routes. Please check your connection and try again."
+                )
             }
         }
     }
 
-    fun backToSearch() {
-        val currentQuery = searchQuery.value
+    private fun backToPreviousScreen() {
+        val storedPreviousState = previousState
 
-        updateUiState {
-            if (currentQuery.isBlank()) {
-                showFavorites(_favorites.value)
-            } else {
-                showSearchResults()
-            }.clearSelectedAirport()
-        }
-    }
-
-    fun toggleFavorite(departureCode: String, destinationCode: String) {
-        viewModelScope.launch {
-            try {
-                favoriteRepository.toggleFavorite(departureCode, destinationCode)
-            } catch (e: Exception) {
-                val message = "Failed to toggle favorite: ${e.message}"
-                updateUiState { showError(message) }
+        // If we have a stored previous state, restore it
+        if (storedPreviousState != null) {
+            _uiState.value = storedPreviousState
+            previousState = null
+        } else {
+            viewModelScope.launch {
+                loadFavorites()
             }
         }
     }
 
+    private fun toggleFavorite(
+        departureCode: String,
+        destinationCode: String
+    ) = viewModelScope.launch {
+        // 收藏操作不直接改变主UI状态，而是通过更新数据库，
+        // 依赖于收藏夹页面的实时数据流来刷新UI
+        favoriteRepository.toggleFavorite(departureCode, destinationCode)
+    }
+
+    // 这个方法可以保持不变，因为它与主UI状态机解耦，用于单个列表项的UI更新
     fun observeFavoriteStatus(
         departureCode: String,
         destinationCode: String
     ): StateFlow<Boolean> {
         return favoriteRepository.observeFavoriteStatus(departureCode, destinationCode)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), false)
-
     }
-
-    fun clearError() {
-        updateUiState { clearError() }
-    }
-
-    private fun FlightSearchUiState.showLoading(): FlightSearchUiState = copy(
-        isLoading = true,
-        errorMessage = null
-    )
-
-    private fun FlightSearchUiState.hideLoading(): FlightSearchUiState = copy(
-        isLoading = false
-    )
-
-    private fun FlightSearchUiState.showError(
-        message: String?
-    ): FlightSearchUiState = copy(
-        isLoading = false,
-        errorMessage = message
-    )
-
-    private fun FlightSearchUiState.clearError(): FlightSearchUiState = copy(
-        errorMessage = null
-    )
-
-    private fun FlightSearchUiState.showFavorites(
-        favorites: List<Favorite>
-    ): FlightSearchUiState = copy(
-        displayMode = DisplayMode.Favorites,
-        favorites = favorites,
-        airports = emptyList(),
-        isLoading = false,
-        errorMessage = null
-    )
-
-    private fun FlightSearchUiState.showAirports(
-        airports: List<Airport>
-    ): FlightSearchUiState = copy(
-        displayMode = DisplayMode.Search,
-        favorites = emptyList(),
-        airports = airports,
-        isLoading = false,
-        errorMessage = null
-    )
-
-    private fun FlightSearchUiState.showRoutes(
-        selectedAirport: Airport,
-        destinations: List<Airport>
-    ): FlightSearchUiState = copy(
-        displayMode = DisplayMode.Routes,
-        selectedAirport = selectedAirport,
-        destinationAirports = destinations,
-        airports = emptyList(),
-        favorites = emptyList(),
-        isLoading = false,
-        errorMessage = null
-    )
-
-    private fun FlightSearchUiState.clearSearch(): FlightSearchUiState = copy(
-        airports = emptyList(),
-        isLoading = false,
-        errorMessage = null
-    )
-
-    private fun FlightSearchUiState.showSearchResults(): FlightSearchUiState =
-        copy(
-            displayMode = DisplayMode.Search,
-            favorites = emptyList(),
-            selectedAirport = null,
-            destinationAirports = emptyList()
-        )
-
-    private fun FlightSearchUiState.selectAirport(airport: Airport): FlightSearchUiState =
-        copy(selectedAirport = airport)
-
-    private fun FlightSearchUiState.clearSelectedAirport(): FlightSearchUiState =
-        copy(
-            selectedAirport = null,
-            destinationAirports = emptyList()
-        )
 }
 
-enum class DisplayMode {
-    Search,
-    Favorites,
-    Routes
+// 步骤 1: 定义清晰、互斥的UI状态
+sealed interface FlightSearchUiState {
+    // 初始加载状态
+    data object Loading : FlightSearchUiState
+
+    // 收藏夹/主页状态
+    data class Favorites(
+        val favorites: List<Favorite>
+    ) : FlightSearchUiState
+
+    // 搜索结果状态
+    data class SearchResults(
+        val query: String,
+        val airports: List<Airport>,
+        val isLoading: Boolean = false
+    ) : FlightSearchUiState
+
+    // 航线详情状态
+    data class Routes(
+        val departureAirport: Airport,
+        val destinationAirports: List<Airport>,
+        val isLoading: Boolean = false
+    ) : FlightSearchUiState
+
+    // 错误状态
+    data class Error(
+        val message: String
+    ) : FlightSearchUiState
 }
 
-data class FlightSearchUiState(
-    val displayMode: DisplayMode = DisplayMode.Favorites,
-    val isLoading: Boolean = false,
-    val airports: List<Airport> = emptyList(),
-    val favorites: List<Favorite> = emptyList(),
-    val selectedAirport: Airport? = null,
-    val destinationAirports: List<Airport> = emptyList(),
-    val errorMessage: String? = null
-)
+// 步骤 2: 定义所有用户意图/事件
+sealed interface FlightSearchEvent {
+    data class QueryChanged(
+        val query: String
+    ) : FlightSearchEvent
+
+    data class AirportSelected(
+        val airport: Airport
+    ) : FlightSearchEvent
+
+    data class ToggleFavoriteClicked(
+        val departureCode: String,
+        val destinationCode: String
+    ) : FlightSearchEvent
+
+    data object BackToPreviousScreen : FlightSearchEvent
+}

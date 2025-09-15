@@ -198,8 +198,9 @@ sqlite3 flight_database.db
 - ✅ **MainActivity和主题测试框架** - 完整的组件测试页面
 - ✅ **代码架构优化** - 模块化组件设计
 - ✅ **Clean Architecture数据层完全实现** - 企业级数据层架构
-- 🔄 **进行中**: 实现ViewModel和UI层
-- ⏳ **下一步**: 创建FlightSearchViewModel和核心UI界面
+- ✅ **FlightSearchViewModel完全实现** - 完整的状态管理和业务逻辑
+- 🔄 **进行中**: 实现核心UI组件
+- ⏳ **下一步**: 创建FlightSearchScreen和核心UI界面
 
 ### 已实现功能
 - [x] **完整的项目基础架构** - 依赖管理、主题系统、分支策略
@@ -215,7 +216,14 @@ sqlite3 flight_database.db
   - [x] Paging 3集成 (大数据量处理)
   - [x] Flow响应式编程 (shareIn性能优化)
   - [x] DataStore用户偏好存储 (搜索状态持久化)
-- [ ] ViewModel层 (业务逻辑和UI状态管理)
+- [x] **ViewModel层完全实现** - 完整的状态管理和业务逻辑 ✅
+  - [x] FlightSearchViewModel (响应式状态管理)
+  - [x] FlightSearchUiState (完整的UI状态定义)
+  - [x] DisplayMode枚举 (Search, Favorites, Routes三种模式)
+  - [x] 搜索防抖优化 (300ms debounce)
+  - [x] 错误处理和加载状态管理
+  - [x] 收藏功能响应式状态观察
+  - [x] DataStore集成的搜索查询持久化
 - [ ] UI层 (Compose界面组件)
 - [ ] 导航系统 (Navigation Compose)
 - [ ] 数据预置 (assets/database文件)
@@ -260,6 +268,17 @@ sqlite3 flight_database.db
   - Hilt依赖注入完整配置，@Singleton + @ApplicationContext
   - 竞态条件防护，线程安全的数据操作
   - DataStore响应式用户偏好存储，搜索状态持久化
+- **FlightSearchViewModel架构**: 完整实现响应式状态管理
+  - StateFlow + 防抖搜索，300ms优化用户体验
+  - 集中化状态更新模式，避免状态不一致
+  - 完整的错误处理和加载状态管理
+  - 三种显示模式支持 (Search/Favorites/Routes)
+  - 实时收藏状态观察，响应式UI更新
+  - DataStore集成，自动搜索查询持久化
+  - 超时处理机制，10秒统一超时保护
+  - 智能导航状态恢复，previousState机制
+  - 竞态条件防护，安全的异步操作
+  - 全面的单元测试覆盖，16个测试用例
 - **依赖配置优化**: 解决了Paging Compose和Room Paging的依赖问题
 
 ### 已解决的技术问题
@@ -270,13 +289,13 @@ sqlite3 flight_database.db
 5. **中英文混合注释**: 统一转换为英文注释，提升代码规范性
 6. **依赖解析错误**: 修复androidx.paging依赖的group名称问题
 7. **Room Paging集成**: 添加room-paging依赖，成功集成PagingSource功能
+8. **ViewModel状态管理复杂性**: 通过集中化状态更新模式和StateFlow优化解决
+9. **ViewModel架构重构**: 实现sealed interface状态机和事件驱动架构
+10. **测试覆盖完善**: 添加16个综合测试用例，包含超时、错误和边界场景
+11. **竞态条件和超时处理**: 实现withTimeoutOrNull和firstOrNull安全操作
+12. **代码重复消除**: 通过showFavoriteOrSearch方法统一查询逻辑
 
 ### 下一阶段计划
-- **ViewModel层实现**: 创建FlightSearchViewModel
-  - 实现搜索状态管理
-  - 集成Repository数据流
-  - 处理用户交互逻辑
-  - 实现收藏功能的UI状态
 - **核心UI组件**: 基于设计系统实现界面
   - FlightSearchScreen主界面
   - SearchBar自动完成搜索
@@ -306,4 +325,4 @@ sqlite3 flight_database.db
 
 ---
 
-*该文档已于 2025-01-09 更新，记录了Clean Architecture数据层的完整实现*
+*该文档已于 2025-01-09 更新，记录了FlightSearchViewModel的完整实现和状态管理架构*
