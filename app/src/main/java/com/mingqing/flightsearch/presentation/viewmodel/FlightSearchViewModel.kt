@@ -35,7 +35,7 @@ class FlightSearchViewModel @Inject constructor(
     val uiState: StateFlow<FlightSearchUiState> = _uiState.asStateFlow()
 
     // 依然保留对搜索词的监听，这是驱动搜索逻辑的最佳方式
-    private val searchQuery: StateFlow<String> = userPreferencesRepository.getSearchQuery()
+    val searchQuery: StateFlow<String> = userPreferencesRepository.getSearchQuery()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000L),

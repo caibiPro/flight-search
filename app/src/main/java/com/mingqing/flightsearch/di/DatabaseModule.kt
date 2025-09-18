@@ -25,7 +25,9 @@ object DatabaseModule {
             context = context,
             klass = FlightDatabase::class.java,
             name = FlightDatabase.DATABASE_NAME
-        ).createFromAsset("database/flight_search.db").build()
+        )
+        // .createFromAsset("database/flight_search.db")
+        .build()
 
     }
 
