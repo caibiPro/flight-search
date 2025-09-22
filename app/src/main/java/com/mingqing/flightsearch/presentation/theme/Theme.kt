@@ -101,10 +101,7 @@ fun FlightSearchTheme(
             val window = (view.context as Activity).window
             val controller = WindowCompat.getInsetsController(window, view)
 
-            // Enable edge-to-edge design
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-
-            // Make status bar transparent and adjust content colors based on theme
+            // 设置状态栏和导航栏的外观
             controller.isAppearanceLightStatusBars = !darkTheme
             controller.isAppearanceLightNavigationBars = !darkTheme
         }

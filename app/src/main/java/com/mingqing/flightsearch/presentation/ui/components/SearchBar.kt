@@ -17,7 +17,11 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -33,18 +37,31 @@ fun SearchBar(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String = "搜索机场（IATA代码或名称）",
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    onSearch: (() -> Unit)? = null
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
 
+    // 使用本地状态来管理输入，避免频繁重组
+    var localQuery by remember { mutableStateOf(query) }
+
+    // 当外部query变化时，同步到本地状态（比如清空操作）
+    LaunchedEffect(query) {
+        if (localQuery != query) {
+            localQuery = query
+        }
+    }
 
     OutlinedTextField(
         modifier = modifier
             .fillMaxWidth()
             .focusRequester(focusRequester),
-        value = query,
-        onValueChange = onQueryChange,
+        value = localQuery,
+        onValueChange = { newValue ->
+            localQuery = newValue
+            onQueryChange(newValue)
+        },
         placeholder = {
             Text(
                 text = placeholder,
@@ -60,9 +77,12 @@ fun SearchBar(
             )
         },
         trailingIcon = {
-            if (query.isNotEmpty()) {
+            if (localQuery.isNotEmpty()) {
                 IconButton(
-                    onClick = { onQueryChange("") }
+                    onClick = {
+                        localQuery = ""
+                        onQueryChange("")
+                    }
                 ) {
                     Icon(
                         imageVector = Icons.Default.Clear,
@@ -80,6 +100,7 @@ fun SearchBar(
         keyboardActions = KeyboardActions(
             onSearch = {
                 keyboardController?.hide()
+                onSearch?.invoke()
             }
         ),
         shape = RoundedCornerShape(16.dp),

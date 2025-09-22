@@ -3,6 +3,7 @@ package com.mingqing.flightsearch.di
 import android.content.Context
 import androidx.room.Room
 import com.mingqing.flightsearch.data.database.FlightDatabase
+import com.mingqing.flightsearch.data.database.FlightDatabaseCallback
 import com.mingqing.flightsearch.data.database.dao.AirportDao
 import com.mingqing.flightsearch.data.database.dao.FavoriteDao
 import dagger.Module
@@ -26,9 +27,9 @@ object DatabaseModule {
             klass = FlightDatabase::class.java,
             name = FlightDatabase.DATABASE_NAME
         )
-        // .createFromAsset("database/flight_search.db")
+        .addCallback(FlightDatabaseCallback()) // 添加预填充回调
+        .fallbackToDestructiveMigration() // 开发阶段：数据库结构变化时重建
         .build()
-
     }
 
     @Provides
